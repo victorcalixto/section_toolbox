@@ -1,0 +1,35 @@
+# blender_manifest.toml
+
+schema_version = "1.0.0"
+
+# Pick a globally-unique id (no spaces). Including your name helps avoid clashes.
+id = "victor_calixto.section_box_planar"
+
+version = "0.0.1"
+name = "Section Toolbox"
+tagline = "Parametric section box and planar cuts with SVG DXF export"
+maintainer = "Victor Calixto"
+type = "add-on"
+
+# Extensions require 4.2+; keep this at least 4.2.0
+blender_version_min = "4.2.0"
+
+license = [
+  "SPDX:GPL-3.0-or-later",
+]
+
+# Optional but helpful (must be from Blender’s allowed list)
+tags = ["Modeling", "Import-Export", "CAD", "Architecture"]
+
+# Declare why file-system access is needed (short, no trailing period)
+[permissions]
+files = "Export SVG and DXF to disk"
+
+# Optional build settings — keep defaults unless you need to tweak packaging.
+# [build]
+# paths_exclude_pattern = [
+#   "__pycache__/",
+#   "/.git/",
+#   "/*.zip",
+# ]
+
