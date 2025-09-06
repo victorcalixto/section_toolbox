@@ -1,5 +1,5 @@
 # __init__.py
-# Wrapper/loader for the Section Box + Planar Sections add-on.
+# Wrapper/loader for the Section Toolbox add-on.
 # - Delegates register()/unregister() to your core module.
 # - Supports multiple possible core filenames so you can rename without touching __init__.
 
@@ -16,13 +16,8 @@ bl_info = {
 import importlib
 import sys
 
-# Try these modules (relative to this package) in order.
-# Put your main implementation in one of these files.
 _CORE_CANDIDATES = (
-    ".section_tool4",          # preferred current name
-    ".section_tool",           # older name
-    ".section_box_planar",     # alternate
-    ".section_box",            # legacy
+    ".section_tool",           # name
 )
 
 _CORE = None
@@ -43,7 +38,6 @@ def _load_core():
             _LAST_ERR = e
             _CORE = None  # fall through to clean import attempts
 
-    # Fresh import attempts in order
     for relname in _CORE_CANDIDATES:
         try:
             _CORE = importlib.import_module(relname, pkg)
@@ -52,7 +46,6 @@ def _load_core():
             _LAST_ERR = e
             continue
 
-    # Nothing worked
     names = ", ".join(n.lstrip(".") for n in _CORE_CANDIDATES)
     raise ImportError(
         f"[SectionBox] Could not import a core module. "
@@ -76,12 +69,10 @@ def unregister():
         try:
             _CORE.unregister()
         except Exception:
-            # Don't block Blender's shutdown/uninstall on errors here.
             pass
     _CORE = None
 
 
-# Allow running this file directly in Blender's text editor during development.
 if __name__ == "__main__":
     register()
 
