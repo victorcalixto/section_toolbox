@@ -14,7 +14,7 @@ license = [
   "SPDX:GPL-3.0-or-later",
 ]
 
-tags = ["Modeling", "Import-Export", "CAD", "Architecture"]
+tags =["Modeling", "Mesh", "Import-Export", "3D View", "Object"] 
 
 [permissions]
 files = "Export SVG and DXF to disk"
