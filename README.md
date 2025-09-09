@@ -112,6 +112,3 @@ STB_Results_<BoxName>/Section_###_<Face>/
 
 ## License
 **GPL-3.0-only**
-
-## Credits
-© 2025 Victor Calixto. Logo & docs adapted for **Section Toolbox (STB)**.
