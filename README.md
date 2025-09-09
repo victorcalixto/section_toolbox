@@ -16,7 +16,7 @@
   - `_cut` — exact intersection, clipped to the face rectangle.
   - `_projection` — orthographic edges inside the box slab with **hidden-line removal**.
 - **Filled cut faces** (for closed loops).
-- Each run is **versioned** and organized in nested collections.
+- Each run is **versioned** and organised in nested collections.
 
 ### Planar Sections
 - Create cutting planes in **XY / XZ / YZ**.
@@ -32,26 +32,6 @@
 - **Flip X / Flip Y** toggles to match your drawing convention.
 
 > Note: Internally, generated data may use `SBX_` / `SBP_` prefixes for compatibility. This does not affect usage.
-
----
-
-## Install
-
-### Classic Add-on (ZIP)
-1. Create a module folder and zip the **folder** (not just its files):
-section_toolbox_ext/
-
-├─ init.py # your add-on code (or import your module here)
-├─ README.md
-├─ LICENSE
-└─ icon.png
-
-2. Blender → **Edit → Preferences → Add-ons → Install…**  
-Select the ZIP → enable **Section Toolbox**.
-
-### Blender Extensions (4.2+)
-- Add a `manifest.yaml` at the repository root per the Extensions spec.
-- Publish the repo and submit it to the **Blender Extensions** platform.
 
 ---
 
@@ -83,7 +63,7 @@ STB_Results_<BoxName>/Section_###_<Face>/
 
  **Plane run**
  
- TB_Results_<PlaneName>/Section_###_<Tag>/
+TB_Results_<PlaneName>/Section_###_<Tag>/
 ├─ __Plane/ (frozen plane copy)
 ├─ __Cut/ (…Line_cut…)
 ├─ __Meshes/ (…FillFace…)
