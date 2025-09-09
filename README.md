@@ -91,4 +91,4 @@ TB_Results_<PlaneName>/Section_###_<Tag>/
 ---
 
 ## License
-**GPL-3.0-only**
+**GPL-3.0**
