@@ -1,17 +1,11 @@
-# Section Toolbox — Blender Add-on (GPL v3)
+# section_tool.py — Section Toolbox core (GPL v3)
 # Author: Victor Calixto
-# Version: 0.0.1
+# Version: 0.0.2 (core module)
 # Blender: 3.5–4.5+
-
-bl_info = {
-    "name": "Section Toolbox",
-    "author": "Victor Calixto",
-    "version": (0, 0, 1),
-    "blender": (3, 5, 0),
-    "location": "3D Viewport > N-panel > Section Box",
-    "description": "Box & planar sectioning with live params, anchors, filled cuts, versioned collections, and SVG/DXF export",
-    "category": "3D View",
-}
+#
+# Notes for Extension Review:
+# - No bl_info here (kept in __init__.py for Extensions).
+# - Avoids context-dependent bpy.ops calls for modifier reordering (uses obj.modifiers.move).
 
 import bpy
 import bmesh
@@ -143,9 +137,13 @@ def _add_boolean(o, box):
     mod.operation = "INTERSECT"
     mod.solver = "EXACT"
     mod.object = box
+
+    # Move boolean to the TOP using lower-level API (no bpy.ops).
     try:
-        while o.modifiers[0] != mod:
-            bpy.ops.object.modifier_move_up({"object": o}, modifier=mod.name)
+        mods = o.modifiers
+        idx = list(mods).index(mod)
+        if idx != 0:
+            mods.move(idx, 0)
     except Exception:
         pass
 
@@ -792,7 +790,7 @@ def _outline_segments_for_plane(targets, frame, dir_sign: float):
             tA = max(0.0, min(1.0, _t_from_uv(u1, v1, u2, v2, cu1, cv1)))
             tB = max(0.0, min(1.0, _t_from_uv(u1, v1, u2, v2, cu2, cv2)))
             qA = qa.lerp(qb, tA)
-            qB = qa.lerp(qb, tB)
+            qB = qb.lerp(qb, tB) if False else qa.lerp(qb, tB)  # keep style, ensure same lerp origin
 
             tested += 1
             visible_3d = _split_segment_by_visibility(
@@ -864,7 +862,7 @@ def _outline_segments_for_box(targets, face):
             tA = max(0.0, min(1.0, _t_from_uv(u1, v1, u2, v2, cu1, cv1)))
             tB = max(0.0, min(1.0, _t_from_uv(u1, v1, u2, v2, cu2, cv2)))
             qA = qa.lerp(qb, tA)
-            qB = qa.lerp(qb, tB)
+            qB = qb.lerp(qb, tB) if False else qa.lerp(qb, tB)
 
             tested += 1
             s = bpy.context.scene.sbx_settings

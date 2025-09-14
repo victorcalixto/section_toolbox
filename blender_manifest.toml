@@ -2,7 +2,7 @@ schema_version = "1.0.0"
 
 id = "stb_section_toolbox"
 
-version = "0.0.1"
+version = "0.0.2"
 name = "Section Toolbox"
 tagline = "Parametric section box and planar cuts with SVG DXF export"
 maintainer = "Victor Calixto"
@@ -14,7 +14,7 @@ license = [
   "SPDX:GPL-3.0-or-later",
 ]
 
-tags =["Modeling", "Mesh", "Import-Export", "3D View", "Object"] 
+tags =["Modeling", "Mesh", "Import-Export", "Object"] 
 
 [permissions]
 files = "Export SVG and DXF to disk"

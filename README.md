@@ -1,8 +1,6 @@
-# Section Toolbox (STB)
+# Section Toolbox (STB) — v0.0.2
 
 **Section Toolbox** adds parametric **section boxes** and **planar sections** to Blender with live controls, versioned outputs, and clean 2D exports (SVG/DXF). Drive per-axis anchors, live move/rotate/resize, face-based **cut** & **projection** lines, **filled cut faces**, and planar **elevations** with direction + depth. Elevations/projections are **occlusion-aware** (near geometry hides far geometry).
-
-![Icon](icon.png)
 
 ---
 
@@ -42,7 +40,7 @@
 2. Adjust **Width/Depth/Height** with anchors; **Move/Rotate** live.
 3. Pick a face (±X / ±Y / ±Z) → **Generate Box Section**.
 4. **Export** → _Export SVG (last Box run)_ or _Export DXF (last Box run)_.  
-If the 2D looks mirrored/flipped, toggle **Flip X / Flip Y**.
+   If the 2D looks mirrored/flipped, toggle **Flip X / Flip Y**.
 
 ### Planar Workflow
 1. Choose **Plane** (XY/XZ/YZ), **Direction** (+N/−N), and **Depth**.
@@ -61,8 +59,9 @@ STB_Results_<BoxName>/Section_###_<Face>/
 ├─ __Meshes/ (…FillFace…)
 └─ __Projection/ (…Line_projection…)
 
- **Plane run**
- 
+
+- **Plane run**
+
 TB_Results_<PlaneName>/Section_###_<Tag>/
 ├─ __Plane/ (frozen plane copy)
 ├─ __Cut/ (…Line_cut…)
