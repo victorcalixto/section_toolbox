@@ -1,4 +1,4 @@
-# Section Toolbox (STB) — v0.0.2
+# Section Toolbox (STB)
 
 **Section Toolbox** adds parametric **section boxes** and **planar sections** to Blender with live controls, versioned outputs, and clean 2D exports (SVG/DXF). Drive per-axis anchors, live move/rotate/resize, face-based **cut** & **projection** lines, **filled cut faces**, and planar **elevations** with direction + depth. Elevations/projections are **occlusion-aware** (near geometry hides far geometry).
 
