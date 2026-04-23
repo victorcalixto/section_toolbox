@@ -78,44 +78,55 @@ def _selection_bbox(objs):
     has_vert = False
     for ob in objs:
         ob_eval = ob.evaluated_get(deps)
+        mw = ob_eval.matrix_world
+        verts = None
 
-        # Strategy 1: use evaluated bound_box first (handles meshes, curves, GN instances, merged objects, etc.)
+        # Strategy 1: evaluated mesh (includes modifiers, booleans, etc.)
+        if ob_eval.type == "MESH":
+            me = None
+            try:
+                me = ob_eval.to_mesh(preserve_all_data_layers=False)
+            except Exception:
+                me = None
+            if me is not None and len(me.vertices) > 0:
+                verts = me.vertices
+            if verts:
+                for v in verts:
+                    wv = mw @ v.co
+                    mins.x = min(mins.x, wv.x); mins.y = min(mins.y, wv.y); mins.z = min(mins.z, wv.z)
+                    maxs.x = max(maxs.x, wv.x); maxs.y = max(maxs.y, wv.y); maxs.z = max(maxs.z, wv.z)
+                has_vert = True
+            if me is not None:
+                try:
+                    ob_eval.to_mesh_clear()
+                except Exception:
+                    pass
+            if has_vert:
+                continue
+
+        # Strategy 2: original data mesh (joined meshes, objects where eval mesh is empty)
+        data = getattr(ob, "data", None)
+        if data is not None and hasattr(data, "vertices") and len(data.vertices) > 0:
+            for v in data.vertices:
+                wv = mw @ v.co
+                mins.x = min(mins.x, wv.x); mins.y = min(mins.y, wv.y); mins.z = min(mins.z, wv.z)
+                maxs.x = max(maxs.x, wv.x); maxs.y = max(maxs.y, wv.y); maxs.z = max(maxs.z, wv.z)
+            has_vert = True
+            continue
+
+        # Strategy 3: bound_box as last resort
         try:
             bb = ob_eval.bound_box
-            mw = ob_eval.matrix_world
             for c in bb:
                 wv = mw @ Vector(c)
                 mins.x = min(mins.x, wv.x); mins.y = min(mins.y, wv.y); mins.z = min(mins.z, wv.z)
                 maxs.x = max(maxs.x, wv.x); maxs.y = max(maxs.y, wv.y); maxs.z = max(maxs.z, wv.z)
             has_vert = True
-            continue
         except Exception:
             pass
 
-        # Strategy 2: vertex-accurate bounds via to_mesh for mesh objects
-        if ob_eval.type == "MESH":
-            me = None
-            try:
-                me = ob_eval.to_mesh(preserve_all_data_layers=False)
-                if me and me.vertices:
-                    mw = ob_eval.matrix_world
-                    for v in me.vertices:
-                        wv = mw @ v.co
-                        mins.x = min(mins.x, wv.x); mins.y = min(mins.y, wv.y); mins.z = min(mins.z, wv.z)
-                        maxs.x = max(maxs.x, wv.x); maxs.y = max(maxs.y, wv.y); maxs.z = max(maxs.z, wv.z)
-                    has_vert = True
-            except Exception:
-                pass
-            finally:
-                if me:
-                    try:
-                        ob_eval.to_mesh_clear()
-                    except Exception:
-                        pass
-
     if not has_vert:
         return Vector((0, 0, 0)), Vector((1, 1, 1))
-
     size = (maxs - mins)
     size.x = max(size.x, 0.001); size.y = max(size.y, 0.001); size.z = max(size.z, 0.001)
     center = (maxs + mins) * 0.5
@@ -466,7 +477,25 @@ def _intersect_mesh_with_plane(obj, plane_point_world, plane_normal_world):
     """Return polylines (list[list[Vector]]) where the mesh intersects the plane (evaluated)."""
     deps = bpy.context.evaluated_depsgraph_get()
     ob_eval = obj.evaluated_get(deps)
-    me = ob_eval.to_mesh(preserve_all_data_layers=False)
+    me = None
+    verts_source = None
+    try:
+        me = ob_eval.to_mesh(preserve_all_data_layers=False)
+    except Exception:
+        me = None
+    if me is not None:
+        verts_source = me.vertices
+    if (verts_source is None or len(verts_source) == 0):
+        data = getattr(obj, "data", None)
+        if data is not None and hasattr(data, "vertices") and len(data.vertices) > 0:
+            verts_source = data.vertices
+    if verts_source is None or len(verts_source) == 0:
+        if me is not None:
+            try:
+                ob_eval.to_mesh_clear()
+            except Exception:
+                pass
+        return []
 
     mw = ob_eval.matrix_world
     inv = mw.inverted()
@@ -474,7 +503,36 @@ def _intersect_mesh_with_plane(obj, plane_point_world, plane_normal_world):
     plane_no_local = (inv.to_3x3().transposed() @ plane_normal_world).normalized()
 
     bm = bmesh.new()
-    bm.from_mesh(me)
+    if me is not None:
+        bm.from_mesh(me)
+    else:
+        # Fallback: create bmesh from evaluated data vertices directly
+        # Build vertex+edge+face indices to allow bisect_plane to operate
+        bm_verts = [bm.verts.new(v.co) for v in verts_source]
+        bm.verts.ensure_lookup_table()
+        # Try to copy edges/faces from original data if available
+        data_me = getattr(obj, "data", None)
+        if data_me is not None:
+            try:
+                for e in data_me.edges:
+                    bm.edges.new((bm_verts[e.vertices[0]], bm_verts[e.vertices[1]]))
+            except Exception:
+                pass
+            if data_me.polygons:
+                for p in data_me.polygons:
+                    face_verts = [bm_verts[i] for i in p.vertices]
+                    try:
+                        bm.faces.new(face_verts)
+                    except ValueError:
+                        pass
+                bm.faces.ensure_lookup_table()
+                # Ensure edges exist for face-based bisect
+                for f in bm.faces:
+                    for e in f.edges:
+                        pass
+        bm.edges.ensure_lookup_table()
+        bm.normal_update()
+
     geom = bm.verts[:] + bm.edges[:] + bm.faces[:]
     res = bmesh.ops.bisect_plane(
         bm,
@@ -494,20 +552,46 @@ def _intersect_mesh_with_plane(obj, plane_point_world, plane_normal_world):
         segments.append((v1, v2))
 
     bm.free()
-    ob_eval.to_mesh_clear()
+    if me is not None:
+        try:
+            ob_eval.to_mesh_clear()
+        except Exception:
+            pass
     return _stitch_segments(segments)
 
 def _all_mesh_edges_world(obj):
     deps = bpy.context.evaluated_depsgraph_get()
     ob_eval = obj.evaluated_get(deps)
-    me = ob_eval.to_mesh(preserve_all_data_layers=False)
+    me = None
+    verts_source = None
+    try:
+        me = ob_eval.to_mesh(preserve_all_data_layers=False)
+    except Exception:
+        me = None
+    if me is not None:
+        verts_source = me
+    else:
+        data = getattr(obj, "data", None)
+        if data is not None and hasattr(data, "vertices") and len(data.vertices) > 0:
+            verts_source = data
+        else:
+            verts_source = None
+    if verts_source is None:
+        return []
     mw = ob_eval.matrix_world
     edges = []
-    for e in me.edges:
-        v1 = mw @ me.vertices[e.vertices[0]].co
-        v2 = mw @ me.vertices[e.vertices[1]].co
-        edges.append((v1, v2))
-    ob_eval.to_mesh_clear()
+    try:
+        for e in verts_source.edges:
+            v1 = mw @ verts_source.vertices[e.vertices[0]].co
+            v2 = mw @ verts_source.vertices[e.vertices[1]].co
+            edges.append((v1, v2))
+    except Exception:
+        pass
+    if me is not None:
+        try:
+            ob_eval.to_mesh_clear()
+        except Exception:
+            pass
     return edges
 
 def _stitch_segments(segments, tol=1e-6):
@@ -596,22 +680,43 @@ def _build_world_bvhs(objects):
     trees = []
     for ob in objects:
         ob_eval = ob.evaluated_get(deps)
-        me = ob_eval.to_mesh(preserve_all_data_layers=False)
-        if not me:
+        me = None
+        verts_source = None
+        faces_source = None
+        try:
+            me = ob_eval.to_mesh(preserve_all_data_layers=False)
+        except Exception:
+            me = None
+        if me is not None and me.vertices and me.polygons:
+            verts_source = me.vertices
+            faces_source = me.polygons
+        elif me is not None:
+            # Try fallback on original data if evaluated empty but object is mesh
+            data = getattr(ob, "data", None)
+            if data is not None and hasattr(data, "vertices") and len(data.vertices) > 0:
+                verts_source = data.vertices
+                faces_source = data.polygons
+        if verts_source is None or faces_source is None or len(faces_source) == 0:
+            if me is not None:
+                try:
+                    ob_eval.to_mesh_clear()
+                except Exception:
+                    pass
             continue
         mw = ob_eval.matrix_world
-        verts = [mw @ v.co for v in me.vertices]
-        if not verts or not me.polygons:
-            ob_eval.to_mesh_clear()
-            continue
+        verts = [mw @ v.co for v in verts_source]
         verts_tuples = [tuple(v) for v in verts]
-        polys = [tuple(p.vertices) for p in me.polygons]
+        polys = [tuple(p.vertices) for p in faces_source]
         try:
             tree = BVHTree.FromPolygons(verts_tuples, polys)
             trees.append(tree)
         except Exception:
             pass
-        ob_eval.to_mesh_clear()
+        if me is not None:
+            try:
+                ob_eval.to_mesh_clear()
+            except Exception:
+                pass
     return trees
 
 def _candidate_outline_edges_world(obj, view_dir_world: Vector):
@@ -621,13 +726,60 @@ def _candidate_outline_edges_world(obj, view_dir_world: Vector):
     """
     deps = bpy.context.evaluated_depsgraph_get()
     ob_eval = obj.evaluated_get(deps)
-    me = ob_eval.to_mesh(preserve_all_data_layers=False)
-    if not me:
+    me = None
+    verts_source = None
+    edges_source = None
+    faces_source = None
+    try:
+        me = ob_eval.to_mesh(preserve_all_data_layers=False)
+    except Exception:
+        me = None
+    if me is not None:
+        verts_source = me.vertices
+        edges_source = me.edges
+        faces_source = me.polygons
+    # Fallback for joined/GN objects where evaluated mesh is empty
+    if (verts_source is None or len(verts_source) == 0) and ob_eval.type == "MESH":
+        data = getattr(obj, "data", None)
+        if data is not None and hasattr(data, "vertices") and len(data.vertices) > 0:
+            verts_source = data.vertices
+            edges_source = data.edges
+            faces_source = data.polygons
+    if verts_source is None or len(verts_source) == 0:
+        if me is not None:
+            try:
+                ob_eval.to_mesh_clear()
+            except Exception:
+                pass
         return []
 
     mw = ob_eval.matrix_world
     bm = bmesh.new()
-    bm.from_mesh(me)
+    if me is not None:
+        bm.from_mesh(me)
+    else:
+        # Build bmesh from original data
+        bm_verts = [bm.verts.new(v.co) for v in verts_source]
+        bm.verts.ensure_lookup_table()
+        if edges_source:
+            for e in edges_source:
+                try:
+                    bm.edges.new((bm_verts[e.vertices[0]], bm_verts[e.vertices[1]]))
+                except ValueError:
+                    pass
+        if faces_source:
+            for p in faces_source:
+                try:
+                    bm.faces.new([bm_verts[i] for i in p.vertices])
+                except ValueError:
+                    pass
+            bm.faces.ensure_lookup_table()
+            for f in bm.faces:
+                for e in f.edges:
+                    pass
+        bm.edges.ensure_lookup_table()
+        bm.normal_update()
+
     bm.verts.ensure_lookup_table()
     bm.edges.ensure_lookup_table()
     bm.faces.ensure_lookup_table()
@@ -658,7 +810,11 @@ def _candidate_outline_edges_world(obj, view_dir_world: Vector):
                 v2 = mw @ e.verts[1].co
                 segs.append((v1, v2))
     bm.free()
-    ob_eval.to_mesh_clear()
+    if me is not None:
+        try:
+            ob_eval.to_mesh_clear()
+        except Exception:
+            pass
     return segs
 
 def _estimate_max_depth_along_dir(objects, frame, dir_sign: float):
@@ -1051,7 +1207,8 @@ class SBX_OT_create_from_selection(Operator):
         box = context.active_object
         box.name = BOX_PREFIX
         _ensure_box_display(box)
-        box.dimensions = size
+        # Default cube at scale (1,1,1) is 2 units per axis, so scale = desired / 2
+        box.scale = (size.x * 0.5, size.y * 0.5, size.z * 0.5)
 
         s = context.scene.sbx_settings
         s.width, s.depth, s.height = box.dimensions.x, box.dimensions.y, box.dimensions.z
