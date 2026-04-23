@@ -75,18 +75,11 @@ def _selection_bbox(objs):
     deps = bpy.context.evaluated_depsgraph_get()
     mins = Vector(( 1e18,  1e18,  1e18))
     maxs = Vector((-1e18, -1e18, -1e18))
+    has_vert = False
     for ob in objs:
         ob_eval = ob.evaluated_get(deps)
-        if ob_eval.type == "MESH":
-            me = ob_eval.to_mesh(preserve_all_data_layers=False)
-            if me and me.vertices:
-                mw = ob_eval.matrix_world
-                for v in me.vertices:
-                    wv = mw @ v.co
-                    mins.x = min(mins.x, wv.x); mins.y = min(mins.y, wv.y); mins.z = min(mins.z, wv.z)
-                    maxs.x = max(maxs.x, wv.x); maxs.y = max(maxs.y, wv.y); maxs.z = max(maxs.z, wv.z)
-                ob_eval.to_mesh_clear()
-                continue
+
+        # Strategy 1: use evaluated bound_box first (handles meshes, curves, GN instances, merged objects, etc.)
         try:
             bb = ob_eval.bound_box
             mw = ob_eval.matrix_world
@@ -94,8 +87,35 @@ def _selection_bbox(objs):
                 wv = mw @ Vector(c)
                 mins.x = min(mins.x, wv.x); mins.y = min(mins.y, wv.y); mins.z = min(mins.z, wv.z)
                 maxs.x = max(maxs.x, wv.x); maxs.y = max(maxs.y, wv.y); maxs.z = max(maxs.z, wv.z)
+            has_vert = True
+            continue
         except Exception:
             pass
+
+        # Strategy 2: vertex-accurate bounds via to_mesh for mesh objects
+        if ob_eval.type == "MESH":
+            me = None
+            try:
+                me = ob_eval.to_mesh(preserve_all_data_layers=False)
+                if me and me.vertices:
+                    mw = ob_eval.matrix_world
+                    for v in me.vertices:
+                        wv = mw @ v.co
+                        mins.x = min(mins.x, wv.x); mins.y = min(mins.y, wv.y); mins.z = min(mins.z, wv.z)
+                        maxs.x = max(maxs.x, wv.x); maxs.y = max(maxs.y, wv.y); maxs.z = max(maxs.z, wv.z)
+                    has_vert = True
+            except Exception:
+                pass
+            finally:
+                if me:
+                    try:
+                        ob_eval.to_mesh_clear()
+                    except Exception:
+                        pass
+
+    if not has_vert:
+        return Vector((0, 0, 0)), Vector((1, 1, 1))
+
     size = (maxs - mins)
     size.x = max(size.x, 0.001); size.y = max(size.y, 0.001); size.z = max(size.z, 0.001)
     center = (maxs + mins) * 0.5
@@ -1031,7 +1051,7 @@ class SBX_OT_create_from_selection(Operator):
         box = context.active_object
         box.name = BOX_PREFIX
         _ensure_box_display(box)
-        box.scale = size * 0.5
+        box.dimensions = size
 
         s = context.scene.sbx_settings
         s.width, s.depth, s.height = box.dimensions.x, box.dimensions.y, box.dimensions.z
